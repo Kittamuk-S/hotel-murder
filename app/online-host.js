@@ -22,20 +22,31 @@
     let stage = 'role';                 // role | night | dawn | day | vote | raid | over
     let acks = new Set(), readyVote = new Set(), hands = {}, ballot = [];
     let proposals = {}, resultSeat = null, lastNight = null, deadline = null;
+    const dropped = new Set();          // human seats that left and are bot-played meanwhile (may rejoin)
+    const REACTIONS = ['🤨', '😱', '🫵', '👍', '😂', '🔪'], REACT_GAP_MS = 2000, BLUFF_CAP = 3;
+    let bluffs = {}, lastReact = {}, reactId = 0, nightActor = null;
     const isBot = (id) => !humans.has(id);
     const aliveHumans = () => HM.aliveList(S).filter((p) => humans.has(p.id)).map((p) => p.id);
+    // who the table waits for: living humans; if only dead (spectating) humans remain, the ones still connected
+    const waitFor = () => { const a = aliveHumans(); return a.length ? a : [...humans]; };
 
     // ------------------------------------------------------------ what each seat is told
     function mic(seat) {
-      if (stage === 'over' || S.phase === 'over') return true;
+      if (stage === 'over') return true;
       if (stage === 'night') return false;
       return S.players[seat].alive;
+    }
+    // a claim is public once said; send only its known fields (never the whole engine record)
+    function publicClaim(c) {
+      const out = {};
+      ['as', 'kind', 'floor', 'count', 'col', 'room', 'target', 'cmp'].forEach((k) => { if (c[k] !== undefined) out[k] = c[k]; });
+      return out;
     }
     function humanClaims(seat) {
       return Bots.realClaims(HM.viewFor(S, seat)).filter((c) => HM.CLAIM_ROLES.includes(c.as) || c.kind === 'peek');
     }
     function payload(seat) {
-      const v = HM.viewFor(S, seat);
+      const v = HM.viewFor(S, seat, { hideReveal: stage === 'dawn' || stage === 'raid' });
       const m = { t: 'screen', stage, v, mic: mic(seat), humans: [...humans], now: now(), deadline, acked: [...acks] };
       if (stage === 'night') {
         const a = HM.currentActor(S);
@@ -46,10 +57,11 @@
       if (stage === 'dawn') m.dawn = lastNight;
       if (stage === 'day') {
         const mine = S.claims.filter((c) => c.day === S.day && c.by === seat).map((c) => JSON.stringify(c));
-        m.chat = S.claims.filter((c) => c.day === S.day).map((c) => ({ by: c.by, text: Ctl.describeClaim(S, c) }));
+        m.chat = S.claims.filter((c) => c.day === S.day).map((c) => ({ by: c.by, text: Ctl.describeClaim(S, c), claim: publicClaim(c) }));
         m.proposals = Object.keys(proposals).filter((id) => S.players[id].alive).map((id) => ({ by: +id, room: proposals[id] }));
         m.myProposal = proposals[seat] || null;
         m.readyVote = [...readyVote];
+        m.passed = [...readyVote];
         if (v.me.alive) {
           m.claimOptions = humanClaims(seat).map((c, i) => ({ i, text: Ctl.describeClaim(S, c), said: mine.includes(JSON.stringify(Object.assign({ day: S.day, by: seat }, c))) }));
           m.canBluff = S.day > 1;
@@ -62,23 +74,27 @@
         m.submitted = Object.keys(hands).map(Number);
       }
       if (stage === 'raid') m.raid = S.lastRaid && Object.assign({}, S.lastRaid, { hands: lastHands });
+      if (stage === 'raid' || stage === 'over') m.raidBy = lastRaidBy;      // who proposed the room that was raided last (the ballot is public)
       return m;
     }
-    let lastHands = {};
+    let lastHands = {}, lastRaidBy = [];
     function push() { humans.forEach((seat) => send(seat, payload(seat))); }
 
     // ------------------------------------------------------------ night
-    function advanceNight() {
+    function advanceNight(keepDeadline) {
       stage = 'night';
       if (S.phase === 'night' && (!S.night || S.night.forDay !== S.day)) HM.startNight(S);
       for (let guard = 0; guard < 100; guard++) {
         const a = HM.currentActor(S);
         if (!a) {
           lastNight = HM.resolveNight(S);
-          stage = 'dawn'; acks = new Set(); deadline = now() + ACK_MS;
+          stage = 'dawn'; acks = new Set(); deadline = now() + ACK_MS; nightActor = null;
           return push();
         }
-        if (humans.has(a.playerId)) { deadline = now() + NIGHT_MS; return push(); }
+        if (humans.has(a.playerId)) {
+          if (!(keepDeadline && nightActor === a.playerId && deadline != null)) deadline = now() + NIGHT_MS;
+          nightActor = a.playerId; return push();
+        }
         HM.act(S, a.playerId, Bots.botNight(HM.viewFor(S, a.playerId), HM.nightOptions(S, a.playerId), rnd));
       }
       throw new Error('night did not finish');
@@ -89,7 +105,7 @@
       if (S.phase === 'dawn') HM.startDay(S);
       const speakers = HM.shuffle(HM.aliveList(S).filter((p) => isBot(p.id)).map((p) => p.id), rnd);
       speakers.forEach((id) => Bots.botClaims(HM.viewFor(S, id), rnd).forEach((c) => HM.addClaim(S, id, c)));
-      proposals = {};
+      proposals = {}; bluffs = {};
       speakers.forEach((id) => { if (rnd() < 0.85) proposals[id] = Bots.botProposal(HM.viewFor(S, id), rnd); });
       readyVote = new Set(); hands = {}; ballot = [];
       stage = 'day'; deadline = now() + dayMs;
@@ -114,6 +130,8 @@
       });
       HM.resolveRaid(S, ballot.map((b) => b.room), yes);
       lastHands = yes;
+      const won = ballot.find((b) => b.room === S.lastRaid.room);
+      lastRaidBy = won ? won.by.slice() : [];
       stage = 'raid'; acks = new Set(); deadline = now() + ACK_MS;
       push();
     }
@@ -130,12 +148,12 @@
         if (a) HM.act(S, a.playerId, Bots.botNight(HM.viewFor(S, a.playerId), HM.nightOptions(S, a.playerId), rnd));
         advanceNight();
       }
-      else if (stage === 'day') { if (!aliveHumans().length || allIn(readyVote, aliveHumans()) || late) startVote(); }
+      else if (stage === 'day') { if (!humans.size || allIn(readyVote, waitFor()) || late) startVote(); }
       else if (stage === 'vote') { if (allIn(new Set(Object.keys(hands).map(Number)), aliveHumans()) || late) resolveVote(); }
       else if (stage === 'dawn') {
-        if (allIn(acks, aliveHumans()) || late || (S.phase === 'over' && allIn(acks, [...humans]))) { if (S.phase === 'over') { stage = 'over'; push(); } else beginDay(); }
+        if (allIn(acks, waitFor()) || late || (S.phase === 'over' && allIn(acks, [...humans]))) { if (S.phase === 'over') { stage = 'over'; push(); } else beginDay(); }
       } else if (stage === 'raid') {
-        if (allIn(acks, aliveHumans()) || late) { if (S.phase === 'over') { stage = 'over'; push(); } else advanceNight(); }
+        if (allIn(acks, waitFor()) || late) { if (S.phase === 'over') { stage = 'over'; push(); } else advanceNight(); }
       }
     }
 
@@ -167,6 +185,8 @@
         }
         case 'bluff':
           if (stage === 'day' && S.players[seat].alive && S.day > 1 && HM.CLAIM_ROLES.includes(msg.as)) {
+            if ((bluffs[seat] || 0) >= BLUFF_CAP) return fail(new Error('โกหกได้ไม่เกิน ' + BLUFF_CAP + ' ครั้งต่อวัน'));
+            bluffs[seat] = (bluffs[seat] || 0) + 1;
             HM.addClaim(S, seat, Bots.fakeClaim(HM.viewFor(S, seat), rnd, msg.as)); push();
           }
           break;
@@ -178,7 +198,8 @@
           push();
           break;
         case 'voteReady':
-          if (stage === 'day' && S.players[seat].alive) { readyVote.add(seat); progress(); if (stage === 'day') push(); }
+          // a dead spectator may pass only when no living human is left (otherwise nobody could ever end the day)
+          if (stage === 'day' && (S.players[seat].alive || !aliveHumans().length)) { readyVote.add(seat); progress(); if (stage === 'day') push(); }
           break;
         case 'hands':
           if (stage === 'vote' && S.players[seat].alive && !hands[seat]) {
@@ -186,6 +207,15 @@
             progress(); if (stage === 'vote') push();
           }
           break;
+        case 'react': {
+          if (!REACTIONS.includes(msg.e)) return;
+          const t = now();
+          if (lastReact[seat] != null && t - lastReact[seat] < REACT_GAP_MS) return;
+          lastReact[seat] = t;
+          const out = { t: 'react', by: seat, e: msg.e, id: ++reactId };
+          humans.forEach((h) => send(h, out));
+          break;
+        }
         default:
       }
     }
@@ -193,14 +223,32 @@
     // a human who left the table becomes a bot; the game never waits for them again
     function dropSeat(seat) {
       if (!humans.delete(seat)) return;
-      if (resultSeat === seat) resultSeat = null;
+      dropped.add(seat);
+      const hadResult = resultSeat === seat;
+      if (hadResult) resultSeat = null;
       acks.delete(seat); readyVote.delete(seat); delete hands[seat];
-      if (stage === 'night') advanceNight();
+      if (stage === 'night') {
+        const a = HM.currentActor(S);
+        // only re-run the night when the dropped seat was holding it up; otherwise keep the current actor's deadline
+        // and any other seat's pending result screen exactly as they are
+        if (hadResult || (a && a.playerId === seat && resultSeat == null)) advanceNight(true);
+        else push();
+      }
       else { progress(); if (!['night'].includes(stage)) push(); }
     }
 
+    function rejoinSeat(seat) {
+      if (!dropped.has(seat) || humans.has(seat)) return false;
+      dropped.delete(seat); humans.add(seat);
+      push();
+      return true;
+    }
+
+    // re-send the current screen to one seat (a guest that reconnected while the host had not noticed the old link drop)
+    function sync(seat) { if (humans.has(seat)) send(seat, payload(seat)); }
+
     return {
-      S, receive, dropSeat, tick: progress, start() { deadline = now() + ROLE_MS; push(); },
+      S, receive, dropSeat, rejoinSeat, sync, tick: progress, start() { deadline = now() + ROLE_MS; push(); },
       get stage() { return stage; }, get humans() { return [...humans]; },
     };
   }

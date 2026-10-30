@@ -83,3 +83,17 @@ test('witness deduction: a trusted "higher" result steers innocents to higher fl
   const a = Bots.analyse(HM.viewFor(s, w.id));
   assert.ok(a.fw[5] > a.fw[2] * 100);
 });
+
+test('accomplice is never offered or makes a claim naming the accomplice role', () => {
+  const s = HM.newGame(7, 5);
+  const acc = s.accompliceId;
+  s.notes[acc].push({ day: 1, kind: 'peek', target: (acc + 1) % 7, floor: 2 });
+  s.day = 2;
+  const v = HM.viewFor(s, acc);
+  const real = Bots.realClaims(v);
+  assert.equal(real.length, 1);
+  assert.equal(real[0].as, 'detective');
+  for (let i = 0; i < 200; i++) {
+    Bots.botClaims(v, HM.mulberry32(i)).forEach((c) => assert.notEqual(c.as, 'accomplice'));
+  }
+});

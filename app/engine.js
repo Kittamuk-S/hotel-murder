@@ -221,6 +221,7 @@
       s.closed.add(key);
     }
     n.victim = victim; n.outcome = outcome;
+    (s.nightLog = s.nightLog || []).push({ day: s.day, locked: n.locked, chosen: key, outcome, victim });
     s.phase = 'dawn';
     s.events.push({ day: s.day, type: outcome, room: key, player: victim });
     checkWin(s);
@@ -282,8 +283,9 @@
   }
 
   // ---------------------------------------------------------------- redacted view (what player `pid` may see)
-  function viewFor(s, pid) {
-    const over = s.phase === 'over';
+  // opts.hideReveal: redact as if the game were still running (winner/winReason stay visible)
+  function viewFor(s, pid, opts) {
+    const over = s.phase === 'over' && !(opts && opts.hideReveal);
     const me = byId(s, pid);
     const mate = partnerOf(s, me);
     const players = s.players.map((p) => {
@@ -301,7 +303,16 @@
       me: { id: pid, role: me.role, room: me.room, alive: me.alive, notes: s.notes[pid].slice(), mateId: mate ? mate.id : null,
         teamNotes: me.role === 'murderer' && s.accompliceId != null ? s.notes[s.accompliceId].filter((x) => x.kind === 'peek') : [] },
     };
-    if (over) v.reveal = { lockHistory: s.lockHistory.slice() };
+    if (over) {
+      const notes = {};
+      s.players.forEach((p) => { notes[p.id] = s.notes[p.id].map((x) => Object.assign({}, x)); });
+      v.reveal = {
+        lockHistory: s.lockHistory.slice(),
+        nights: (s.nightLog || []).map((x) => Object.assign({}, x)),
+        notes,
+        raids: s.events.filter((e) => e.type === 'raid').map((e) => ({ day: e.day, outcome: e.outcome, room: e.room, player: e.player })),
+      };
+    }
     return v;
   }
 

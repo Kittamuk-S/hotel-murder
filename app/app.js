@@ -24,16 +24,20 @@
       if (k === 'class') e.className = v;
       else if (k.startsWith('on')) e[k] = v;
       else if (k.startsWith('data-') || k.startsWith('aria-')) e.setAttribute(k, v);
-      else e[k] = v;
+      else e[k === 'for' ? 'htmlFor' : k] = v;
     });
     kids.flat(Infinity).forEach((c) => { if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c))); });
     return e;
   }
+  let curPhase = null, lastCaughtBy = [];
   function show(...nodes) {
     if (timer) { clearInterval(timer); timer = null; }
     app.replaceChildren(...nodes.flat(Infinity).filter(Boolean));
     window.scrollTo(0, 0);
+    if (window.FX) { FX.phase(curPhase); FX.enter(app, true); }
   }
+  const phased = (name, ...nodes) => { curPhase = name; show(...nodes); };
+  const actionbar = (btn, why) => h('div', { class: 'actionbar' }, btn, why ? h('span', { class: 'why' }, why) : null);
   const view = () => HM.viewFor(S, ME);
   const nm = (id) => S.players[id].name;
 
@@ -50,9 +54,9 @@
       for (let c = 1; c <= v.cols; c++) {
         const k = HM.roomKey(f, c);
         const kind = closed[k];
-        const label = kind === 'empty' ? 'ห้องว่าง' : kind === 'raid' ? 'ถูกบุก' : kind ? 'พบศพ' : k === v.me.room ? 'ห้องคุณ' : '';
-        const cls = 'cell' + (kind ? (kind === 'empty' || kind === 'raid' ? ' vote' : ' closed') : '') + (k === v.me.room ? ' mine' : '');
-        row.append(h('div', { class: cls }, h('b', {}, k), label));
+        const title = kind === 'empty' ? 'ห้องว่าง' : kind === 'raid' ? 'ถูกบุก' : kind ? 'พบศพ' : k === v.me.room ? 'ห้องคุณ' : '';
+        const cls = 'cell' + (kind ? (kind === 'empty' ? ' empty' : kind === 'raid' ? ' raid' : ' corpse dead') : '') + (k === v.me.room ? ' mine' : '');
+        row.append(h('div', { class: cls, title }, h('b', {}, k)));
       }
       wrap.append(row);
     }
@@ -103,7 +107,7 @@
   function home() {
     const nameIn = h('input', { type: 'text', id: 'name', value: 'คุณ', maxLength: 14, autocomplete: 'off' });
     const nSel = h('select', { id: 'count' }, [6, 7, 8, 9].map((n) => h('option', { value: n, selected: n === 7 }, `${n} คน (คุณ + บอต ${n - 1})${n === 7 ? ' — ตามคลิปสอนเล่น' : ''}`)));
-    show(
+    phased(null,
       h('h1', {}, 'HOTEL MURDER'), h('p', { class: 'center sub' }, 'ปริศนาโรงแรมมรณะ'), h('div', { class: 'deco' }),
       h('div', { class: 'panel' },
         h('p', {}, 'เล่นคนเดียวกับบอต ตัวเกมทำหน้าที่ “โฮสต์” แทนคน คุณจะได้บทบาทลับและห้องลับ ฆาตกรซ่อนอยู่ในหมู่แขก ฝ่ายบริสุทธิ์มี 4 วันที่จะหาห้องของฆาตกรให้เจอก่อนเขาหนีไปได้'),
@@ -132,16 +136,22 @@
   function roleScreen() {
     const v = view();
     const mate = v.me.mateId != null ? v.players[v.me.mateId] : null;
-    show(
-      h('h2', { class: 'center' }, 'บทบาทของคุณ'), roleCard(v),
-      h('p', { class: 'center' }, `ห้องของคุณคือ `, h('b', {}, v.me.room), ' (ห้ามบอกใคร)'),
-      mate ? h('p', { class: 'center' }, `${HM.ROLES[mate.role].name}ของคุณคือ `, h('b', {}, mate.name), ` (ห้อง ${mate.room})`) : null,
+    const hide = h('button', { class: 'btn hide-role', type: 'button' }, 'ซ่อนบทบาท');
+    const wrap = h('div', { class: 'flip' }, h('div', { class: 'inner' },
+      h('div', { class: 'front' }, roleCard(v),
+        h('p', { class: 'center' }, `ห้องของคุณคือ `, h('b', {}, v.me.room), ' (ห้ามบอกใคร)'),
+        mate ? h('p', { class: 'center' }, `${HM.ROLES[mate.role].name}ของคุณคือ `, h('b', {}, mate.name), ` (ห้อง ${mate.room})`) : null, hide),
+      h('div', { class: 'back' }, h('span', {}, 'แตะเพื่อดูบทบาท'))));
+    phased('night',
+      h('h2', { class: 'center' }, 'บทบาทของคุณ'), wrap,
       h('h3', {}, `ห้องที่พบศพตอนเริ่มเกม (${v.closed.length} ห้อง)`), board(v),
-      h('button', { class: 'btn go', type: 'button', onclick: day }, 'เริ่มวันที่ 1'));
+      actionbar(h('button', { class: 'btn go', type: 'button', onclick: day }, 'เริ่มวันที่ 1'), 'ซ่อนบทบาทก่อนส่งเครื่องต่อหรือเริ่มเกม'));
+    if (window.FX) FX.flipCard(wrap, { hideButton: hide });
   }
 
   function sleepScreen(then) {
-    show(h('div', { class: 'sleep' }, h('span', { class: 'moon', 'aria-hidden': 'true' }, '🌙'), 'ทุกคนหลับตา...', h('p', { class: 'sub' }, `คืนที่ ${S.day}`)));
+    const sky = h('div', {}); if (window.FX) FX.stars(sky);
+    phased('night', h('div', { class: 'sleep' }, sky, 'ทุกคนหลับตา...', h('p', { class: 'sub' }, `คืนที่ ${S.day}`)));
     setTimeout(then, 1800);
   }
 
@@ -156,8 +166,9 @@
     const v = view();
     let picked = null;
     const go = h('button', { class: 'btn go', type: 'button', disabled: true }, 'ยืนยัน');
+    const why = h('span', { class: 'why' }, 'เลือกก่อนจึงจะยืนยันได้');
     const body = [];
-    const pick = (val) => { picked = val; go.disabled = false; };
+    const pick = (val) => { picked = val; go.disabled = false; why.textContent = ''; };
     const titles = {
       lock: 'คุณคือช่างกุญแจ — เลือกห้องที่จะล็อก', kill: 'คุณคือฆาตกร — เลือกห้องที่จะลงมือ',
       peek: o.role === 'detective' ? 'คุณคือนักสืบ — เลือกผู้เล่นที่จะสืบ' : 'คุณคือผู้ช่วยฆาตกร — เลือกผู้เล่นที่จะตรวจ',
@@ -194,37 +205,74 @@
       if (res && res.result) return resultScreen();
       night();
     };
-    show(h('h2', {}, `คืนที่ ${S.day}`), h('p', { class: 'sub' }, 'เลือกด้วยความเงียบ ไม่มีใครเห็นการเลือกของคุณ'), statusLine(v),
+    phased('night', h('h2', {}, `คืนที่ ${S.day}`), h('p', { class: 'sub' }, 'เลือกด้วยความเงียบ ไม่มีใครเห็นการเลือกของคุณ'), statusLine(v),
       h('h3', {}, titles[o.type]), message ? h('div', { class: 'toast', role: 'alert' }, message) : null,
-      body, go, notebook(v), h('details', {}, h('summary', {}, 'แผนผังโรงแรม'), board(v)));
+      body, notebook(v), h('details', {}, h('summary', {}, 'แผนผังโรงแรม'), board(v)), h('div', { class: 'actionbar' }, go, why));
   }
 
   function resultScreen() {
     const v = view(); const last = v.me.notes[v.me.notes.length - 1];
-    show(h('h2', {}, 'ผลที่คุณได้รับ'), h('div', { class: 'panel' }, h('p', { class: 'center', style: 'font-size:20px' }, noteText(v, last).replace(/^คืนที่ \d+: /, ''))),
+    phased('night', h('h2', {}, 'ผลที่คุณได้รับ'), h('div', { class: 'panel' }, h('p', { class: 'center', style: 'font-size:20px' }, noteText(v, last).replace(/^คืนที่ \d+: /, ''))),
       h('p', { class: 'sub center' }, 'จดไว้ได้ในสมุดโน้ต ผลนี้เป็นความลับของคุณ'),
-      h('button', { class: 'btn go', type: 'button', onclick: night }, 'หลับตาต่อ'));
+      actionbar(h('button', { class: 'btn go', type: 'button', onclick: night }, 'หลับตาต่อ')));
   }
 
   function dawn(d) {
     const v = view();
-    const text = d.outcome === 'death' ? `ฆาตกรบุกห้อง ${d.room} — ${nm(d.victim)} เสียชีวิต`
-      : d.outcome === 'empty' ? `ฆาตกรบุกห้อง ${d.room} — ห้องว่าง ไม่มีใครเสียชีวิต`
-        : `ฆาตกรบุกห้อง ${d.room} แต่ประตูถูกล็อก — ลงมือไม่สำเร็จ`;
-    show(h('h2', {}, `รุ่งเช้า`), h('div', { class: 'panel' + (d.outcome === 'death' ? ' bad' : '') }, h('p', { class: 'center', style: 'font-size:20px' }, text),
+    const stage = h('div', { class: 'dawn-stage', 'aria-live': 'polite' });
+    const boardBox = h('div', {});
+    const next = S.phase === 'over' ? h('button', { class: 'btn go', type: 'button', onclick: overScreen, disabled: true }, 'ดูผล')
+      : h('button', { class: 'btn go', type: 'button', onclick: day, disabled: true }, `เข้าสู่วันที่ ${S.day + 1}`);
+    const why = h('span', { class: 'why' }, 'รอฟังประกาศรุ่งเช้า...');
+    phased('dawn', h('h2', {}, 'รุ่งเช้า'), stage, boardBox,
       d.victim === ME ? h('p', { class: 'center sub' }, 'คุณออกจากเกมแล้ว แต่ยังดูเกมต่อได้') : null,
-      d.outcome === 'death' ? h('p', { class: 'center sub' }, 'ผู้เสียชีวิตคืนคีย์การ์ดและออกจากเกม ไม่เปิดเผยบทบาท') : null),
-      board(v),
-      S.phase === 'over' ? h('button', { class: 'btn go', type: 'button', onclick: overScreen }, 'ดูผล') : h('button', { class: 'btn go', type: 'button', onclick: day }, `เข้าสู่วันที่ ${S.day + 1}`));
+      d.outcome === 'death' ? h('p', { class: 'center sub' }, 'ผู้เสียชีวิตคืนคีย์การ์ดและออกจากเกม ไม่เปิดเผยบทบาท') : null,
+      h('div', { class: 'actionbar' }, next, why));
+    const last = d.outcome === 'death' ? { text: `${nm(d.victim)} เสียชีวิต`, kind: 'death' }
+      : d.outcome === 'empty' ? { text: 'ห้องว่าง ไม่มีใครเสียชีวิต', kind: 'big' }
+        : { text: 'ประตูถูกล็อก ลงมือไม่สำเร็จ', kind: 'locked' };
+    const lines = [{ text: 'ฆาตกรลงมือเมื่อคืน...' }, { text: `ชั้น ${HM.floorOf(d.room)}` }, { text: `ห้อง ${d.room}`, kind: 'big' }, last];
+    const fin = () => { if (!stage.isConnected) return; boardBox.replaceChildren(board(v)); next.disabled = false; why.textContent = ''; };
+    if (window.FX) FX.dawnSequence(stage, lines).then(fin);
+    else { lines.forEach((l) => stage.append(h('div', { class: 'dawn-line shown' + (l.kind ? ' ' + l.kind : '') }, l.text))); fin(); }
   }
 
   function chatList() {
     const list = h('div', { class: 'chat' });
-    S.claims.filter((c) => c.day === S.day).forEach((c) => list.append(h('div', { class: 'msg' + (c.by === ME ? ' me' : '') }, h('b', {}, c.by === ME ? 'คุณ' : nm(c.by)), ': ', HMCtl.describeClaim(S, c))));
     Object.keys(ctl.proposals).forEach((id) => {
       if (S.players[id].alive) list.append(h('div', { class: 'msg sus' }, h('b', {}, nm(+id)), ': ขอเสนอบุกห้อง ', ctl.proposals[id]));
     });
-    if (!list.children.length) list.append(h('p', { class: 'sub' }, 'ยังไม่มีใครพูดอะไร'));
+    if (!list.children.length) list.append(h('p', { class: 'sub' }, 'ยังไม่มีใครเสนอห้อง'));
+    return list;
+  }
+
+  // players strip: who proposed a room, who is out
+  function pbar(myRoom) {
+    const bar = h('div', { class: 'pbar', 'aria-label': 'ผู้เล่น' });
+    S.players.forEach((p) => {
+      const room = p.id === ME ? myRoom : ctl.proposals[p.id];
+      const cls = 'pchip' + (!p.alive ? ' out' : room ? ' proposed' : '');
+      bar.append(h('span', { class: cls }, (p.id === ME ? 'คุณ' : p.name) + (!p.alive ? ' (ออก)' : room ? ` → ${room}` : '')));
+    });
+    return bar;
+  }
+
+  // public claims; two players claiming the same role + same kind on the same day with different results conflict
+  function claimConflicts() {
+    const sig = (c) => JSON.stringify(Object.keys(c).filter((k) => k !== 'day' && k !== 'by').sort().map((k) => [k, c[k]]));
+    const bad = new Set();
+    S.claims.forEach((a, i) => S.claims.forEach((b, j) => {
+      if (i < j && a.day === b.day && a.as === b.as && a.kind === b.kind && a.by !== b.by && sig(a) !== sig(b)) { bad.add(i); bad.add(j); }
+    }));
+    return bad;
+  }
+  function claimboard() {
+    const bad = claimConflicts();
+    if (!S.claims.length) return h('p', { class: 'sub' }, 'ยังไม่มีใครประกาศผล');
+    const list = h('ul', { class: 'claimboard', 'aria-label': 'ผลที่ประกาศ' });
+    S.claims.forEach((c, i) => {
+      list.append(h('li', { class: bad.has(i) ? 'conflict' : '' }, h('b', {}, `วันที่ ${c.day} · ${c.by === ME ? 'คุณ' : nm(c.by)}`), h('span', {}, HMCtl.describeClaim(S, c))));
+    });
     return list;
   }
 
@@ -233,7 +281,8 @@
     if (dayBegun !== S.day || S.phase === 'dawn') { ctl.beginDay(); dayBegun = S.day; }
     const v = view(); const alive = v.me.alive;
     let myRoom = null;
-    const chatBox = h('div', {}); const renderChat = () => chatBox.replaceChildren(chatList()); renderChat();
+    const chatBox = h('div', {}), claimsBox = h('div', {}), pbarBox = h('div', {});
+    const renderChat = () => { chatBox.replaceChildren(chatList()); claimsBox.replaceChildren(claimboard()); pbarBox.replaceChildren(pbar(myRoom)); }; renderChat();
     const claimBox = h('div', {});
     if (alive) {
       ctl.humanClaims().forEach((c) => claimBox.append(h('button', { class: 'btn', type: 'button', onclick: (e) => { ctl.say(c.claim); e.target.disabled = true; renderChat(); } }, `ประกาศ: ${c.text}`)));
@@ -245,35 +294,42 @@
     if (alive) {
       const shown = h('p', { class: 'sub' }, 'คุณยังไม่ได้เสนอห้อง (ไม่เสนอก็ได้)');
       proposeBox.append(h('details', {}, h('summary', {}, 'เสนอห้องที่จะรุมบุก'),
-        roomGrid(HM.openRooms(S).filter((k) => k !== v.me.room), v.cols, (k) => { myRoom = k; shown.textContent = `คุณเสนอบุกห้อง ${k}`; }), shown));
+        roomGrid(HM.openRooms(S).filter((k) => k !== v.me.room), v.cols, (k) => { myRoom = k; shown.textContent = `คุณเสนอบุกห้อง ${k}`; renderChat(); }), shown));
     }
     let left = 240; const clock = h('div', { class: 'timer', 'aria-label': 'เวลาอภิปรายที่เหลือ' });
     const toVote = () => raidVoteScreen(myRoom);
     const tick = () => { clock.textContent = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`; if (left-- <= 0) { clearInterval(timer); toVote(); } };
-    show(h('h2', {}, `กลางวัน วันที่ ${S.day}`), statusLine(v), clock,
+    phased('day', h('div', { class: 'sun', 'aria-hidden': 'true' }), h('h2', { class: 'center' }, `กลางวัน วันที่ ${S.day}`), statusLine(v), clock, pbarBox,
       alive ? null : h('div', { class: 'toast' }, 'คุณออกจากเกมแล้ว ดูการอภิปรายได้อย่างเดียว'),
       S.day === 1 ? h('p', { class: 'sub' }, 'วันแรกยังไม่มีใครถูกฆ่า แต่เสนอห้องและบุกได้เลย') : null,
-      h('h3', {}, 'การอภิปราย'), chatBox, claimBox, proposeBox, notebook(v), h('details', { open: true }, h('summary', {}, 'แผนผังโรงแรม'), board(v)),
-      h('button', { class: 'btn go', type: 'button', onclick: toVote }, 'ไปยกมือโหวต'));
+      h('h3', {}, 'ผลที่ประกาศ'), claimsBox, h('h3', {}, 'การเสนอห้อง'), chatBox, claimBox, proposeBox, notebook(v), h('details', { open: true }, h('summary', {}, 'แผนผังโรงแรม'), board(v)),
+      actionbar(h('button', { class: 'btn go', type: 'button', onclick: toVote }, 'ไปยกมือโหวต'), 'เวลาหมดจะเข้าสู่การโหวตเอง'));
     timer = setInterval(tick, 1000); tick();
+  }
+
+  function doRaid(myRoom, yes) {
+    const by = {}; ctl.ballot(myRoom).forEach((b) => { by[b.room] = b.by; });
+    const res = ctl.raid(myRoom, yes);
+    lastCaughtBy = res.outcome === 'murderer' ? (by[res.room] || []) : [];
+    return res;
   }
 
   function raidVoteScreen(myRoom) {
     if (S.phase !== 'day') return S.phase === 'over' ? overScreen() : night();     // never vote twice (timer + button)
     const v = view();
     const ballot = ctl.ballot(myRoom);
-    if (!v.me.alive || !ballot.length) return raidResult(ctl.raid(myRoom, []));
+    if (!v.me.alive || !ballot.length) return raidResult(doRaid(myRoom, []));
     const need = Math.floor(HM.aliveList(S).length / 2) + 1;
     const yes = new Set();
     const rows = ballot.map(({ room, by }) => {
       const chk = h('input', { type: 'checkbox', id: `r${room}`, onchange: () => { if (chk.checked) yes.add(room); else yes.delete(room); } });
       return h('label', { for: `r${room}`, class: 'opt' }, chk, ` ห้อง ${room}`, h('small', {}, `เสนอโดย ${by.map((i) => (i === ME ? 'คุณ' : nm(i))).join(', ')}`));
     });
-    show(h('h2', {}, 'ยกมือโหวตบุกห้อง'), statusLine(v),
+    phased('day', h('h2', {}, 'ยกมือโหวตบุกห้อง'), statusLine(v),
       h('p', { class: 'sub' }, `โฮสต์ไล่นับจากเลขห้องน้อยไปมาก ห้องแรกที่ได้ ${need} เสียงขึ้นไป (มากกว่าครึ่งของคนที่ยังอยู่) จะถูกบุก ถ้าไม่มีห้องไหนถึง วันนี้ไม่มีใครถูกบุก`),
       h('div', { class: 'panel' }, rows),
-      h('button', { class: 'btn go', type: 'button', onclick: () => raidResult(ctl.raid(myRoom, [...yes])) }, 'ยืนยันการยกมือ'),
-      notebook(v), h('details', {}, h('summary', {}, 'แผนผังโรงแรม'), board(v)));
+      notebook(v), h('details', {}, h('summary', {}, 'แผนผังโรงแรม'), board(v)),
+      actionbar(h('button', { class: 'btn go', type: 'button', onclick: () => raidResult(doRaid(myRoom, [...yes])) }, 'ยืนยันการยกมือ'), 'ไม่ติ๊กห้องไหนก็ยืนยันได้ (ไม่ยกมือให้ห้องใด)'));
   }
 
   function raidResult(res) {
@@ -289,19 +345,58 @@
     const rows = res.tallies.map((t) => h('tr', {}, h('td', {}, `ห้อง ${t.room}`), h('td', {}, `${t.yes} / ${res.alive} เสียง`)));
     const next = S.phase === 'over' ? h('button', { class: 'btn go', type: 'button', onclick: overScreen }, 'ดูผลเกม')
       : h('button', { class: 'btn go', type: 'button', onclick: night }, `เริ่มคืนที่ ${S.day}`);
-    show(h('h2', {}, `ผลการบุกวันที่ ${res.day}`), h('div', { class: 'panel' }, h('p', { class: 'center', style: 'font-size:19px' }, text())),
-      rows.length ? h('details', { open: true }, h('summary', {}, 'ผลนับเสียง'), h('table', {}, rows)) : null, board(v), next);
+    phased('day', h('h2', {}, `ผลการบุกวันที่ ${res.day}`), h('div', { class: 'panel' }, h('p', { class: 'center', style: 'font-size:19px' }, text())),
+      rows.length ? h('details', { open: true }, h('summary', {}, 'ผลนับเสียง'), h('table', {}, rows)) : null, board(v), actionbar(next));
+  }
+
+  function recap(v) {
+    const R = v.reveal, items = [];
+    const who = (id) => (id === ME ? 'คุณ' : nm(id));
+    const maxDay = Math.max(0, ...R.raids.map((r) => r.day), ...R.nights.map((n) => n.day));
+    for (let d = 1; d <= maxDay; d++) {
+      R.raids.filter((r) => r.day === d).forEach((r) => {
+        const t = r.outcome === 'murderer' ? `ห้อง ${r.room} คือห้องฆาตกร จับ ${who(r.player)} ได้`
+          : r.outcome === 'evicted' ? `บุกห้อง ${r.room} ${who(r.player)} ออกจากเกม`
+            : r.outcome === 'empty' ? `บุกห้อง ${r.room} เป็นห้องว่าง` : 'ไม่มีห้องไหนถูกบุก';
+        items.push(h('li', { class: 'day' }, `วันที่ ${d}: ${t}`));
+      });
+      R.nights.filter((n) => n.day === d).forEach((n) => {
+        const t = n.outcome === 'death' ? `ฆาตกรบุกห้อง ${n.chosen} — ${who(n.victim)} เสียชีวิต`
+          : n.outcome === 'empty' ? `ฆาตกรบุกห้อง ${n.chosen} — ห้องว่าง` : `ฆาตกรบุกห้อง ${n.chosen} แต่ประตูถูกล็อก`;
+        items.push(h('li', { class: 'night' }, `คืนที่ ${d}: ${t}${n.locked ? ` (ล็อกห้อง ${n.locked})` : ''}`));
+      });
+    }
+    return h('ul', { class: 'recap' }, items.length ? items : h('li', { class: 'day' }, 'จบเกมโดยไม่มีเหตุการณ์'));
+  }
+
+  function awards(v) {
+    const R = v.reveal, out = [];
+    const who = (id) => (id === ME ? 'คุณ' : nm(id));
+    const first = R.nights.find((n) => n.outcome === 'death');
+    if (first) out.push(`เหยื่อรายแรก: ${who(first.victim)} (คืนที่ ${first.day})`);
+    const killer = v.players.find((p) => p.role === 'murderer');
+    const escapes = R.raids.filter((r) => r.outcome !== 'murderer').length;
+    if (killer && escapes > 0) out.push(`รอดหวุดหวิด: ${who(killer.id)} (ฆาตกร) รอดจากการโหวตบุก ${escapes} ครั้ง`);
+    const cnt = {}; S.claims.forEach((c) => { cnt[c.by] = (cnt[c.by] || 0) + 1; });
+    const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || a - b)[0];
+    if (top != null) out.push(`ปากไว: ${who(+top)} ประกาศผลมากที่สุด ${cnt[top]} ครั้ง`);
+    if (S.winner === 'บริสุทธิ์' && lastCaughtBy.length) out.push(`สายตาเฉียบ: ${lastCaughtBy.map(who).join(', ')} เสนอห้องที่จับฆาตกรได้`);
+    const saved = R.nights.filter((n) => n.outcome === 'locked').length;
+    if (saved > 0) out.push(`ประตูแน่นหนา: ช่างกุญแจกันการลงมือไว้ ${saved} คืน`);
+    return out.slice(0, 5).map((t) => h('div', { class: 'award' }, t));
   }
 
   function overScreen() {
     const v = view(); const mine = HM.ROLES[v.me.role].side === S.winner;
     const rows = v.players.map((p) => h('tr', {}, h('td', {}, p.id === ME ? `${p.name} (คุณ)` : p.name), h('td', {}, HM.ROLES[p.role].name), h('td', {}, p.room),
       h('td', {}, p.out === 'killed' ? 'ถูกฆ่า' : p.out === 'raided' ? 'ถูกบุกห้อง' : 'รอด')));
-    show(h('div', { class: 'win ' + (S.winner === 'บริสุทธิ์' ? 'good' : 'evil') }, S.winner === 'บริสุทธิ์' ? 'ฝ่ายบริสุทธิ์ชนะ!' : 'ฝ่ายฆาตกรชนะ!'),
+    phased('over', h('div', { class: 'win ' + (S.winner === 'บริสุทธิ์' ? 'good' : 'evil') }, S.winner === 'บริสุทธิ์' ? 'ฝ่ายบริสุทธิ์ชนะ!' : 'ฝ่ายฆาตกรชนะ!'),
       h('p', { class: 'center' }, S.winReason), h('p', { class: 'center sub' }, mine ? 'คุณอยู่ฝ่ายที่ชนะ' : 'คุณอยู่ฝ่ายที่แพ้'),
+      awards(v),
+      h('h3', {}, 'ลำดับเหตุการณ์'), recap(v),
       h('div', { class: 'panel' }, h('table', {}, h('tr', {}, h('th', {}, 'ผู้เล่น'), h('th', {}, 'บทบาท'), h('th', {}, 'ห้อง'), h('th', {}, 'สถานะ')), rows)),
       h('h3', {}, 'ห้องที่ช่างกุญแจล็อกแต่ละคืน'), h('p', { class: 'sub' }, v.reveal.lockHistory.length ? v.reveal.lockHistory.map((b) => `คืน ${b.day}: ${b.room}`).join(' · ') : 'ไม่มีช่างกุญแจ'),
-      board(v), h('button', { class: 'btn go', type: 'button', onclick: home }, 'เล่นใหม่'));
+      board(v), actionbar(h('button', { class: 'btn go', type: 'button', onclick: home }, 'เล่นใหม่')));
   }
 
   home();

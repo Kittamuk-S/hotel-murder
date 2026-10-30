@@ -59,7 +59,8 @@
   // ------------------------------------------------------------ day: public claims
   // results of the night that just ended (notes are stamped with the day of their night)
   function realClaims(view) {
-    const role = view.me.role;
+    // the accomplice never names their own role: their real peek can only be offered "as" the detective
+    const role = view.me.role === 'accomplice' ? 'detective' : view.me.role;
     return view.me.notes.filter((n) => n.day === view.day - 1).map((n) => { const c = Object.assign({ as: role }, n); delete c.day; return c; });
   }
   function attackedFloor(view, night) {

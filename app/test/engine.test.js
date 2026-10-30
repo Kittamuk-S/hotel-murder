@@ -278,3 +278,37 @@ test('claims are public and stamped with the day', () => {
   HM.addClaim(s, 2, { as: 'locksmith', kind: 'lock', room: '402' });
   assert.deepEqual(s.claims[0], { day: 2, by: 2, as: 'locksmith', kind: 'lock', room: '402' });
 });
+
+test('recap: nights/notes/raids appear in reveal only after the game is over', () => {
+  const s = rig();
+  raid(s, [], {});
+  night(s, plan({ murderer: { room: '502' } }));                  // death of the detective's neighbour room
+  HM.startDay(s);
+  for (let me = 0; me < 7; me++) {
+    const v = HM.viewFor(s, me);
+    assert.equal(v.reveal, undefined);
+    assert.equal(JSON.stringify(v).includes('nightLog'), false);
+    v.players.forEach((p) => { if (p.id !== me && p.alive && !(v.me.mateId === p.id)) { assert.equal(p.role, null); assert.equal(p.room, null); } });
+  }
+  raid(s, ['601'], { '601': [2, 3, 4, 6] });
+  assert.equal(s.phase, 'over');
+  const r = HM.viewFor(s, 2).reveal;
+  assert.equal(r.nights.length, 1);
+  assert.deepEqual(r.nights[0], { day: 1, locked: '203', chosen: '502', outcome: 'death', victim: 5 });
+  assert.equal(r.nights[0].victim, 5);
+  assert.equal(r.notes[id(s, 'locksmith')][0].kind, 'lock');
+  assert.equal(Object.keys(r.notes).length, 7);
+  assert.deepEqual(r.raids.map((x) => [x.day, x.outcome, x.room]), [[1, 'skip', null], [2, 'murderer', '601']]);
+});
+
+test('viewFor hideReveal: over-game is redacted like a running game, winner stays', () => {
+  const s = rig(); s.day = 4;
+  raid(s, ['601'], { '601': [2, 3, 4, 5] });
+  assert.equal(s.phase, 'over');
+  const h = HM.viewFor(s, 2, { hideReveal: true });
+  assert.equal(h.reveal, undefined);
+  assert.equal(h.winner, 'บริสุทธิ์');
+  h.players.forEach((p) => { if (p.id !== 2 && p.alive) { assert.equal(p.role, null); assert.equal(p.room, null); } });
+  assert.ok(HM.viewFor(s, 2).reveal);
+  assert.equal(HM.viewFor(s, 2, {}).players[1].role, 'accomplice');
+});
