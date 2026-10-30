@@ -1,0 +1,7 @@
+# Static site: the online mode runs between the players' browsers (PeerJS), so no server of ours is needed.
+services:
+  - type: web
+    name: hotel-murder
+    runtime: static
+    buildCommand: echo "static site"
+    staticPublishPath: .

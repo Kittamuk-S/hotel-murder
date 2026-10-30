@@ -1,0 +1,79 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8"><title>Hotel Murder - สคริปต์โฮสต์</title><style>@page { size: A4; margin: 8mm; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Noto Sans Thai', 'Tahoma', sans-serif; background: #fff; color: #1a1410; }
+h1 { font-size: 16px; margin: 4mm 0 2mm; }
+.note { font-size: 11px; color: #555; margin: 0 0 3mm; }
+.sheet { display: grid; grid-template-columns: repeat(3, 63mm); gap: 3mm; justify-content: center; page-break-after: always; }
+.card { width: 63mm; height: 88mm; border: 1.2px solid #222; border-radius: 3mm; padding: 4mm; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 2mm; }
+.role { background: #fbf5e6; } .role.bad { background: #2a1519; color: #f1e3bf; }
+.role .ico { font-size: 30px; text-align: center; margin-top: 2mm; }
+.role h2 { margin: 0; font-size: 20px; text-align: center; }
+.role .side { text-align: center; font-size: 11px; letter-spacing: .5px; opacity: .7; }
+.role .rule { font-size: 11.5px; line-height: 1.5; white-space: pre-line; margin-top: 1mm; }
+.role .ord { position: absolute; right: 3mm; top: 2mm; font-size: 11px; opacity: .6; }
+.art { padding: 0; gap: 0; background: #0b1020; color: #f3e6bf; border-color: #0b1020; }
+.art.bad { background: #1a0709; border-color: #1a0709; }
+.art img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+.art .shade { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; background: linear-gradient(to bottom, rgba(11,16,32,0) 0%, rgba(11,16,32,.88) 32%, #0b1020 100%); }
+.art.bad .shade { background: linear-gradient(to bottom, rgba(26,7,9,0) 0%, rgba(26,7,9,.88) 32%, #1a0709 100%); }
+.art .frame { position: absolute; inset: 2mm; border: .35mm solid #c9a24a; border-radius: 1.6mm; pointer-events: none; }
+.art .frame::before { content: ''; position: absolute; inset: 0.9mm; border: .15mm solid rgba(201,162,74,.6); border-radius: .9mm; }
+.art .num { position: absolute; left: 4mm; top: 4mm; min-width: 6mm; height: 6mm; padding: 0 1mm; border-radius: 50%; background: #0b1020; border: .35mm solid #c9a24a; color: #e9c46a; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.art.bad .num { background: #1a0709; }
+.art .txt { position: absolute; left: 5mm; right: 5mm; bottom: 5mm; text-align: center; }
+.art h2 { margin: 0; font-size: 23px; color: #e9c46a; letter-spacing: .5px; line-height: 1.2; }
+.art .side { font-size: 11px; opacity: .85; margin-bottom: 1.2mm; }
+.art .rule { font-size: 11.2px; line-height: 1.36; white-space: pre-line; }
+.back { padding: 0; background: #0b1020; border-color: #0b1020; }
+.back svg { width: 100%; height: 100%; display: block; }
+.sheet:last-child { page-break-after: auto; }
+@media print { .noprint { display: none; } }
+.host .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1.5mm 5mm; margin: 1.6mm 0; font-size: 11px; }
+.host .row b { font-weight: 700; color: #0b1020; }
+.host .ck { white-space: nowrap; }
+.host .fl { white-space: nowrap; }
+.host .ln { display: inline-block; border-bottom: .3mm solid #0b1020; height: 4.5mm; vertical-align: bottom; }
+.host .rt { display: flex; justify-content: space-between; align-items: center; margin: 1.2mm 0; padding: 1mm 2mm; border: .3mm solid #8a7a4a; background: #fff; font-size: 11px; }
+.host .rt b { letter-spacing: 3mm; font-size: 15px; color: #0b1020; }
+.host .bl { font-size: 10.5px; font-weight: 700; margin-top: 1.5mm; }
+.host .bx { border: .3mm solid #8a7a4a; background: #fff; margin: 1mm 0 1.5mm; }
+.host .two { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm; }
+.host .box2 { border: .3mm solid #8a7a4a; background: #fff; padding: 1.6mm 2.2mm; font-size: 10.6px; line-height: 1.45; margin: 1.2mm 0; }
+.host .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5mm; }
+.host .flow div { border: .3mm solid #0b1020; background: #fff; text-align: center; padding: 1mm 1.4mm 1.6mm; font-size: 10px; line-height: 1.4; }
+.host .flow b { display: block; background: #0b1020; color: #e9c46a; margin: -1mm -1.4mm 1mm; padding: .7mm; font-size: 11px; }
+.ht.txt td { padding: 1.3mm 1.8mm; font-size: 10.6px; line-height: 1.42; vertical-align: top; }
+.host ul.gl { margin: 0 0 1mm; padding-left: 5mm; font-size: 11px; line-height: 1.5; }
+.host ul.gl li { margin: .6mm 0; }
+.toks { display: flex; flex-wrap: wrap; gap: 2.5mm; margin: 1.5mm 0 4mm; }
+.tok { width: 29mm; height: 19mm; border: .35mm solid #000; border-radius: 1.5mm; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; letter-spacing: 1px; outline: .3mm solid #c9a24a; outline-offset: -1.4mm; }
+.tok.dead { background: #2b2b30; color: #d9d9de; } .tok.shut { background: #0f5a43; color: #e9f5ee; } .tok.off { background: repeating-linear-gradient(45deg, #3a3d46, #3a3d46 2mm, #2a2c33 2mm, #2a2c33 4mm); color: #b8bcc8; }
+.coin { width: 22mm; height: 22mm; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; border: .5mm solid #0b1020; }
+.coin.sun { background: repeating-conic-gradient(#8b1a2b 0 7.5deg, #e9c46a 7.5deg 15deg); color: #0b1020; text-shadow: 0 0 2px #fff; }
+.coin.peg { background: #e9c46a; color: #0b1020; width: 16mm; height: 16mm; }
+.host { width: 194mm; margin: 0 auto; padding: 5mm 6mm 4mm; background: #fbf5e6; border: 1.2mm solid #0b1020; outline: .35mm solid #c9a24a; outline-offset: -2.4mm; font-size: 11px; }
+.host .hh { background: #0b1020; color: #e9c46a; text-align: center; padding: 2.5mm 0 2mm; border-bottom: .8mm solid #c9a24a; margin: -1mm -1mm 3mm; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+.host .hh .t { font-size: 22px; font-weight: 800; letter-spacing: 4px; }
+.host .hh .s { font-size: 12px; color: #f3e6bf; letter-spacing: 1px; }
+.host h3 { margin: 3mm 0 1.5mm; font-size: 12.5px; color: #0b1020; border-bottom: .4mm solid #c9a24a; padding-bottom: .6mm; }
+.host h3::before { content: '◆ '; color: #c9a24a; }
+.host .track { display: flex; justify-content: space-between; gap: 4mm; font-size: 11px; padding: 1.5mm 2mm; border: .3mm solid #8a7a4a; background: #f3e6bf; }
+.host .steps { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1.2mm; }
+.host .step { border: .3mm solid #0b1020; background: #fff; text-align: center; padding: 1mm .5mm 5mm; position: relative; line-height: 1.3; }
+.host .step b { display: inline-block; width: 5mm; height: 5mm; line-height: 5mm; border-radius: 50%; background: #0b1020; color: #e9c46a; font-size: 10px; }
+.host .step span { display: block; font-weight: 700; font-size: 10.5px; }
+.host .step i { display: block; font-style: normal; font-size: 9px; color: #555; }
+.host .step u { position: absolute; left: 50%; bottom: 1.2mm; width: 3mm; height: 3mm; margin-left: -1.5mm; border: .3mm solid #0b1020; text-decoration: none; }
+.ht { width: 100%; border-collapse: collapse; }
+.ht th { background: #0b1020; color: #e9c46a; font-size: 10px; padding: 1.2mm 1mm; border: .3mm solid #0b1020; }
+.ht td { border: .3mm solid #8a7a4a; background: #fff; }
+.ht td.day { width: 9mm; text-align: center; font-weight: 800; background: #f3e6bf; font-size: 14px; }
+.room { background: #e8eef2; justify-content: center; align-items: center; text-align: center; }
+.room .big { font-size: 64px; font-weight: 800; }
+.room .sub { font-size: 13px; color: #556; }
+.keys { background: #eadfc8; justify-content: center; align-items: center; text-align: center; }
+@media screen { body { padding: 8px; background: #eee; } .sheet { background: #fff; padding: 6mm; margin-bottom: 8px; } }
+.tok.lock { background: #6b4a12; color: #fbe9b7; }
+.board { width: 196mm; display: block; margin: 0 auto; }
+.tok.kill { background: #8b1a2b; color: #fbe3e6; } .tok.empty { background: #0f5a43; color: #e9f5ee; } .tok.lynch { background: #d9902b; color: #1a1005; }
+</style></head><body><div class="sheet" style="display:block"><div class="host"><div class="hh"><div class="t">HOTEL MURDER</div><div class="s">สคริปต์โฮสต์ (1/2) · เตรียมเกมและกลางคืน</div></div><p class="box2">พูดด้วยน้ำเสียงเรียบๆ และ <b>เรียกทุกบทตามจังหวะเท่ากัน แม้บทนั้นตายไปแล้วหรือไม่มีในเกม</b> เพื่อไม่ให้ใครรู้ว่าใครตาย</p><h3>เตรียมเกม</h3><ul class="gl"><li>ใช้ชั้น 1 ถึงชั้นเท่าจำนวนผู้เล่น วางป้าย “ปรับปรุง” บนชั้นที่เหลือ</li><li>สุ่ม 3 ห้องที่พบศพจากชั้นที่ใช้ วางป้าย “พบศพ” ประกาศเลขห้อง แล้วแจกคีย์การ์ดห้องคว่ำคนละ 1 ใบจากห้องที่เหลือ (ใบที่เหลือคือห้องว่าง)</li><li>แจกการ์ดบทบาทลับ (6 คน ไม่มีช่างเช็ดกระจก · 8 คนเพิ่มแขก 1 · 9 คนเพิ่มแขก 2)</li><li>“ทุกคนหลับตา” เรียกแต่ละบทให้ลืมตาดูการ์ด แล้ว “ผู้ช่วยกับฆาตกรลืมตา ชูคีย์การ์ดให้เห็นกัน” ทุกคนหลับตา “ลืมตาพร้อมกัน 3-2-1”</li><li>เริ่มที่ <b>วัน 1</b> (ยังไม่มีเหตุการณ์เมื่อคืน)</li></ul><h3>คืนที่ N (หลังวัน 1, 2, 3)</h3><table class="ht txt"><tr><th>โฮสต์พูด</th><th>ทำอะไร</th></tr><tr><td style="width:62mm"><b>“ทุกคนหลับตา คืนที่ N ของโรงแรมมรณะเริ่มขึ้น”</b></td><td>รอ 3 วินาที</td></tr><tr><td style="width:62mm"><b>“ช่างกุญแจ ลืมตา เลือกห้องที่จะล็อก”</b></td><td>ช่างกุญแจชี้ห้อง (ห้องที่ยังเปิด ห้ามซ้ำคืนก่อน ล็อกห้องตัวเองได้) โฮสต์จดไว้ “ช่างกุญแจ หลับตา”</td></tr><tr><td style="width:62mm"><b>“แม่บ้าน ลืมตา เลือกชั้น”</b></td><td>โฮสต์นับผู้เล่นที่ยังมีชีวิตในชั้นนั้น (รวมตัวแม่บ้านเอง) แล้วชูนิ้วบอก “แม่บ้าน หลับตา”</td></tr><tr><td style="width:62mm"><b>“ช่างเช็ดกระจก ลืมตา เลือกแถว”</b></td><td>ทำเหมือนแม่บ้านแต่นับตามแถวแนวตั้ง (ทุกชั้น) “ช่างเช็ดกระจก หลับตา”</td></tr><tr><td style="width:62mm"><b>“นักสืบ ลืมตา เลือกผู้เล่นที่จะสืบ”</b></td><td>โฮสต์ชูนิ้วบอก “ชั้น” ที่คนนั้นพัก ไม่บอกแถว “นักสืบ หลับตา”</td></tr><tr><td style="width:62mm"><b>“ผู้ช่วยกับฆาตกร ลืมตา”</b></td><td>ผู้ช่วยชี้ผู้เล่น 1 คน โฮสต์ชูนิ้วบอกชั้น แล้วฆาตกรชี้ห้องที่จะลงมือ (ห้ามห้องตัวเอง ห้องผู้ช่วย ห้องที่ปิด) โฮสต์จดห้องไว้ ทีมสื่อสารเงียบๆ ได้ “ผู้ช่วยกับฆาตกร หลับตา”</td></tr><tr><td style="width:62mm"><b>“พยาน ลืมตา เลือกชั้นที่จะเฝ้า”</b></td><td>ถ้าตรงกับชั้นที่ฆาตกรเลือก ชี้ขึ้น (ห้องฆาตกรสูงกว่า) / ลง (ต่ำกว่า) / ตรง (ชั้นเดียวกัน) ถ้าไม่ตรงไม่บอกอะไร ชี้แม้ห้องนั้นถูกล็อก “พยาน หลับตา”</td></tr><tr><td style="width:62mm"><b>“ทุกคนลืมตา ฟ้าสางแล้ว 3-2-1”</b></td><td>ประกาศผลตามหัวข้อรุ่งเช้า</td></tr></table></div></div><div class="sheet" style="display:block"><div class="host"><div class="hh"><div class="t">HOTEL MURDER</div><div class="s">สคริปต์โฮสต์ (2/2) · เช้า กลางวัน และข้อควรระวัง</div></div><h3>รุ่งเช้า (วัน 2 ขึ้นไป)</h3><ul class="gl"><li>“เมื่อคืนฆาตกรบุกไปที่ชั้น X ห้อง XXX” แล้วบอกอย่างใดอย่างหนึ่ง</li><li><b>มีคนอยู่:</b> “ห้องนี้มีผู้เสียชีวิต กรุณาคืนคีย์การ์ด” (ไม่เปิดบทบาท) วางป้ายฆาตกรรม ห้องปิด</li><li><b>ห้องว่าง:</b> “ห้องนี้ไม่มีคนอยู่” วางป้ายห้องว่าง</li><li><b>ช่างกุญแจล็อกห้องนั้น:</b> “ประตูห้องนี้ล็อกอยู่ ลงมือไม่สำเร็จ” ห้องไม่ปิด</li><li>ตรวจเงื่อนไขชนะ: ฝ่ายฆาตกรเท่ากับผู้บริสุทธิ์ที่เหลือหรือไม่</li></ul><h3>กลางวัน</h3><ul class="gl"><li>“เริ่มอภิปรายได้เลย” พลิกนาฬิกาทราย (ในแอปตั้งไว้ 4 นาที) หมดเวลา: “ขอเลขห้องที่จะรุมบุก 1 ห้อง”</li><li>ทุกคนเสนอได้คนละไม่เกิน 1 ห้อง (ห้องที่ปิดแล้วเสนอไม่ได้) โฮสต์ไล่ห้องจากเลขน้อยไปมาก “ถ้าเลือกบุกห้อง XXX ยกมือพร้อมกัน 3-2-1”</li><li>ห้องแรกที่ได้ <b>มากกว่าครึ่งของคนที่ยังอยู่</b> ถูกบุก ไม่มีห้องไหนถึง: “วันนี้ไม่มีใครถูกบุก”</li><li>เปิดห้อง: <b>ว่าง</b> → “ห้องนี้ว่าง” วางป้ายห้องว่าง · <b>มีคนอยู่</b> → วางป้ายประชาทัณฑ์ “กรุณาคืนคีย์การ์ดและออกจากเกม” (ไม่เปิดบทบาท) ตรวจเงื่อนไขชนะฝ่ายฆาตกร · <b>ห้องฆาตกร</b> → “ฝ่ายบริสุทธิ์ชนะ!”</li><li>จบวัน 4 โดยไม่เจอห้องฆาตกร → “ฆาตกรหนีไปได้ ฝ่ายฆาตกรชนะ” มิฉะนั้นไปคืนถัดไป (วัน 1-3 มีคืนต่อท้าย วัน 4 เป็นโอกาสสุดท้าย)</li></ul><h3>หลังจบเกม</h3><ul class="gl"><li>เปิดเผยบทบาทและห้องของทุกคน ย้อนดูใบบันทึกว่าคืนไหนล็อกห้องไหน ฆาตกรเลือกห้องไหน</li><li>กรอกใบสรุปหลังเกม 1 ใบต่อ 1 เกม</li></ul><h3>ข้อควรระวังของโฮสต์</h3><ul class="gl"><li><b>เรียงลำดับให้ถูก</b> พยานเรียกหลังฆาตกรเสมอ เพราะต้องเทียบกับห้องที่ฆาตกรเลือก</li><li>ผู้เล่นที่ออกจากเกมแล้ว ยังต้องเรียกตามจังหวะเดิม โฮสต์ <b>ไม่ให้ข้อมูลจริง</b> ผู้ที่ออกจากเกมห้ามตอบสนอง</li><li>แม่บ้านและช่างเช็ดกระจกนับเฉพาะคนที่ยังมีชีวิต ณ ตอนนั้น (ก่อนผลของคืนนั้น) รวมตัวเอง</li><li>โฮสต์ <b>ห้ามเผลอพูดตัวเลขหรือคำตอบดังๆ</b> ใช้นิ้วเสมอ</li><li>ที่ต้องจดไว้: ห้องที่ล็อกของคืนก่อน · ห้องที่ปิด · ผู้ที่ออกจากเกม · เลขวัน</li></ul></div></div></body></html>

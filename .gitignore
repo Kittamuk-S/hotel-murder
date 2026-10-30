@@ -1,0 +1,5 @@
+.claude/
+_archive_v0.4/
+variant-clues/_archive_v0.1/
+node_modules/
+*.log

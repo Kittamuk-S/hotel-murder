@@ -1,0 +1,5 @@
+﻿players,floors,columns,rooms,corpse_rooms_at_start,locksmith,housekeeper,windowcleaner,detective,witness,accomplice,murderer,guest
+6,6,3,18,3,1,1,0,1,1,1,1,0
+7,7,3,21,3,1,1,1,1,1,1,1,0
+8,8,3,24,3,1,1,1,1,1,1,1,1
+9,9,3,27,3,1,1,1,1,1,1,1,2
